@@ -1,0 +1,6 @@
+*.csv
+*.pyc
+models/
+predicts/
+run_loop3.sh
+wandb/

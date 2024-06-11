@@ -19,7 +19,7 @@ initial_model=lightblue/karasu-1.1B
 # initial_model=JINIAC/JINIAC-5B-sft_configuration-3_prod-checkpoint-500-dpo_merge_20240526_final
 # initial_model=JINIAC/JINIAC-5B-sft_configuration-3_prod-checkpoint-500-dpo_merge_20240526_final
 
-prompt_path="/content/drive/MyDrive/Geniac/datasets/ELYZA-tasks-100"
+prompt_path="/storage5/takagi/datasets/ELYZA-tasks-100"
 dataset_key="input"
 
 # prompt_path="/content/drive/MyDrive/Geniac/datasets/hh-rlhf-12k-ja_mod"
@@ -27,7 +27,7 @@ dataset_key="input"
 
 # reward_model_path=/content/drive/MyDrive/Geniac/RLHFlow_reward_modeling/RLHF-Reward-Modeling/marged_model_full
 # reward_model_path=/content/drive/MyDrive/Geniac/RLHFlow_reward_modeling/RLHF-Reward-Modeling/llama3_rm
-reward_model_path=/content/drive/MyDrive/Geniac/RLHFlow_reward_modeling/RLHF-Reward-Modeling/mistral_rm
+reward_model_path=/storage5/takagi/models/mistral_rm
 
 function get_last_dir() {
   path=$1
@@ -72,6 +72,7 @@ run_iteration() {
 
     # sampling
     echo "sampling"
+    #conda activate vllm
     CUDA_VISIBLE_DEVICES=0 python ./generation/get_hf2.py \
       --model_name_or_path ${model_path} \
       --dataset_name_or_path ${input_prompt} \
@@ -99,6 +100,7 @@ run_iteration() {
 
     # train
     echo "train"
+    #conda activate rlhflow
     accelerate launch ./dpo_iteration/run_dpo.py \
       --run_name ${iteration_name} \
       --output_dir ${iteration_name}_lora \
@@ -183,7 +185,7 @@ do
         model_path="${model_dir}/${iteration_prefix}/iter${previous_iteration}"
     fi
 
-    run_iteration ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
+#    run_iteration ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
 done
 
 echo "end loop"
@@ -195,10 +197,10 @@ echo ${i}
 iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
 input_prompt=${prompt_path} # json format
 dataset_key=${dataset_key}
-output_generate="${predict_dir}/${iteration_prefix}${i}.json"
-output_reward="${predict_dir}/${iteration_prefix}${i}_reward.json"
+output_generate="${predict_dir}/${iteration_prefix}_${i}.json"
+output_reward="${predict_dir}/${iteration_prefix}_${i}_reward.json"
 
-last_predict ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
+#last_predict ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
 
 python make_summary.py \
   --input_prompt ${input_prompt} \
