@@ -195,8 +195,8 @@ echo ${i}
 iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
 input_prompt=${prompt_path} # json format
 dataset_key=${dataset_key}
-output_generate="${predict_dir}/${iteration_prefix}${i}.json"
-output_reward="${predict_dir}/${iteration_prefix}${i}_reward.json"
+output_generate="${predict_dir}/${iteration_prefix}_${i}.json"
+output_reward="${predict_dir}/${iteration_prefix}_${i}_reward.json"
 
 last_predict ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
 
