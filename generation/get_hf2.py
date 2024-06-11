@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 import numpy as np
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from transformers import (
     AutoTokenizer,
     HfArgumentParser,
@@ -83,10 +83,13 @@ llm = LLM(
     model=model_path,
     tokenizer=model_path,
     dtype="bfloat16",
-    max_model_len=script_args.max_input_length,
+    max_model_len=script_args.max_new_tokens,
     load_format="auto",
     seed=42,
+    gpu_memory_utilization=0.8,
+    trust_remote_code=True,
 )
+
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 
 sampling_params = SamplingParams(
@@ -99,16 +102,24 @@ sampling_params = SamplingParams(
 )
 
 
-ds = load_dataset(script_args.dataset_name_or_path, split="train")
+# ds = load_dataset(script_args.dataset_name_or_path, split="train")
+# ds = load_dataset(script_args.dataset_name_or_path, split="test")
+ds = load_from_disk(script_args.dataset_name_or_path)
+# ds = ds.map(
+#     lambda x: {
+#         "prompt": tokenizer.apply_chat_template(x[script_args.dataset_key], tokenize=False, add_generation_prompt=True)
+#     }
+# )
 ds = ds.map(
     lambda x: {
-        "prompt": tokenizer.apply_chat_template(x[script_args.dataset_key], tokenize=False, add_generation_prompt=True)
+        "prompt": x[script_args.dataset_key]
     }
 )
 
 data_size = len(ds["prompt"])
 one_num_share = int(data_size / script_args.my_world_size)
-ds = ds.select(np.arange(script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share))
+# ds = ds.select(np.arange(script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share))
+ds = ds.select(np.arange(0, 100))
 
 print([script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share])
 print(ds, script_args.dataset_name_or_path)
