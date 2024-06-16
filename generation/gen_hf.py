@@ -1,7 +1,8 @@
 import json
 from dataclasses import dataclass, field
 from typing import List, Optional
-from datasets import load_dataset
+import numpy as np
+from datasets import load_dataset, load_from_disk
 from tqdm import tqdm
 from transformers import AutoTokenizer, HfArgumentParser
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -105,16 +106,43 @@ default_args = {
 
 print(default_args)
 
-ds = load_dataset(ds_dir, split="train")
-# load_dataset("json", data_files=ds_dir, split="train", field="instances")
-print(ds)
+# ds = load_dataset(ds_dir, split="train")
+# # load_dataset("json", data_files=ds_dir, split="train", field="instances")
+# print(ds)
 
-# use tokenizer.apply_template to apply the template to the prompt
+# # use tokenizer.apply_template to apply the template to the prompt
+# ds = ds.map(
+#     lambda x: {
+#         "prompt": tokenizer.apply_chat_template(x[script_args.dataset_key], tokenize=False, add_generation_prompt=True)
+#     }
+# )
+
+
+# ds = load_dataset(script_args.dataset_name_or_path, split="train")
+# ds = load_dataset(script_args.dataset_name_or_path, split="test")
+ds = load_from_disk(script_args.dataset_name_or_path)
+# ds = ds.map(
+#     lambda x: {
+#         "prompt": tokenizer.apply_chat_template(x[script_args.dataset_key], tokenize=False, add_generation_prompt=True)
+#     }
+# )
 ds = ds.map(
     lambda x: {
-        "prompt": tokenizer.apply_chat_template(x[script_args.dataset_key], tokenize=False, add_generation_prompt=True)
+        "prompt": x[script_args.dataset_key]
     }
 )
+
+data_size = len(ds["prompt"])
+# one_num_share = int(data_size / script_args.my_world_size)
+# ds = ds.select(np.arange(script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share))
+ds = ds.select(np.arange(0, 10))
+
+# print([script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share])
+print(ds, script_args.dataset_name_or_path)
+print(ds[0])
+
+
+
 
 
 with ThreadPoolExecutor(max_workers=script_args.max_workers) as executor:
