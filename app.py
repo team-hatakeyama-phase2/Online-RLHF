@@ -29,7 +29,8 @@ rm_pipe = pipeline(
 async def classify_text(request: Request):
     data = await request.json()
     text = data['prompt']
-    result = rm_pipe(text)
+    result = rm_pipe(text, **pipe_kwargs)
+
     return result
 
 if __name__ == '__main__':
