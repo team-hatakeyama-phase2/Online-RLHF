@@ -60,6 +60,8 @@ device = accelerator.device
 ds_dir = script_args.dataset_name_or_path
 ds = load_dataset("json", data_files=ds_dir, split="train", field="instances")
 
+reward_name_or_path = script_args.reward_name_or_path
+
 
 """
 We process the data format here and query the reward model to get the rewards.
