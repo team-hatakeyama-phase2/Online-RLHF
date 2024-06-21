@@ -39,6 +39,7 @@ for reward in reward_files:
     dfs.append(df[use_columns])
 
 merged_df = original_df
+
 for i, df in enumerate(dfs):
     merged_df = merged_df.merge(df, on="prompt", suffixes=(f'_{i}', f'_{i+1}'))
 
@@ -46,6 +47,10 @@ merged_df['original_index'] = merged_df.index
 explode_columns = [x for x in merged_df.columns if x.startswith('responses_') or x.startswith('rewards_')]
 sort_columns = ['original_index'] + [x for x in merged_df.columns if x.startswith('rewards')]
 ascendings = [True] + [False] * (len(sort_columns) - 1)
+#print(sort_columns)
 
+#print(merged_df.explode(explode_columns).sort_values(sort_columns, ascending=ascendings))
+
+#print(merged_df.head(2).explode(explode_columns).sort_values(sort_columns).drop(columns=['original_index', 'input']))
 merged_df.explode(explode_columns).sort_values(sort_columns, ascending=ascendings).drop(columns=['original_index', 'input']).to_csv(f"{iteration_prefix}_summary.csv", index=False)
-
+#merged_df.explode(explode_columns).drop(columns=['original_index', 'input']).to_csv(f"{iteration_prefix}_summary.csv", index=False)

@@ -10,8 +10,8 @@ my_world_size=1 # how many gpu you use
 # initial_model="TODO: Set initial model path here"
 # initial_model=TinyLlama/TinyLlama_v1.1
 # initial_model=llm-jp/llm-jp-1.3b-v1.0
-#initial_model=lightblue/karasu-1.1B
-initial_model=CohereForAI/c4ai-command-r-v01
+initial_model=lightblue/karasu-1.1B
+#initial_model=CohereForAI/c4ai-command-r-v01
 
 # initial_model=hatakeyama-llm-team/Tanuki-8B-Instruct-without-DPO
 # initial_model=nk2t/Llama-3-8B-Instruct-japanese-nk2t-v0.3
@@ -77,7 +77,7 @@ generate_and_reward() {
       --temperature 1.0 \
       --local_index 0 \
       --my_world_size ${my_world_size} \
-      --max_new_tokens 512 & \
+      --max_new_tokens 512 \
       --eos_ids 6 &
 #      --eos_ids 128009 &
 
@@ -150,10 +150,9 @@ run_iteration() {
 #      --beta ${dpo_beta}
 
 
-
-
     # lora merge
     echo "merge"
+    echo from ${iteration_name}_lora
     python ./merge_lora.py \
       --lora_model_path ${iteration_name}_lora \
       --merged_dir ${iteration_name}
@@ -208,6 +207,9 @@ echo "last predict"
 
 i=$((i+1))
 echo "i="${i}
+previous_iteration=$((i-1))
+model_path="${model_dir}/${iteration_prefix}/iter${previous_iteration}"
+
 iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
 input_prompt=${prompt_path} # json format
 dataset_key=${dataset_key}

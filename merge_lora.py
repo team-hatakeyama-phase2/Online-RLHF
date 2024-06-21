@@ -15,7 +15,7 @@ merged_dir = args.merged_dir
 # モデルの読み込み
 model = AutoPeftModelForCausalLM.from_pretrained(
     lora_model_path,
-    torch_dtype=torch.float16,
+    torch_dtype=torch.bfloat16,
     device_map="auto",
 )
 
