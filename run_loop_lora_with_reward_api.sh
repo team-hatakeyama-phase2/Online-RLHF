@@ -44,7 +44,7 @@ function get_last_dir() {
 model_info=$(get_last_dir ${initial_model})
 prompt_info=$(get_last_dir ${prompt_path})
 reward_info=$(get_last_dir ${reward_model_path})
-dpo_beta=0.5
+dpo_beta=0.2
 
 echo "model:"${model_info}
 echo "prompt:"${prompt_info}
@@ -77,6 +77,7 @@ generate_and_reward() {
       --temperature 1.0 \
       --local_index 0 \
       --my_world_size ${my_world_size} \
+      --max_new_tokens 512 & \
       --eos_ids 6 &
 #      --eos_ids 128009 &
 
@@ -116,7 +117,6 @@ run_iteration() {
 
     # train
     echo "train"
-    #conda activate rlhflow
     accelerate launch \
       --config_file ./accelerate_configs/single_gpu.yaml \
       ./dpo_iteration/run_dpo_lora.py \
@@ -132,6 +132,25 @@ run_iteration() {
       --loss_type sigmoid \
       --lr_scheduler_type cosine \
       --beta ${dpo_beta}
+
+#    accelerate launch \
+#      --config_file ./accelerate_configs/multi_gpu.yaml \
+#      ./dpo_iteration/run_dpo_lora.py \
+#      --run_name ${iteration_name} \
+#      --output_dir ${iteration_name}_lora \
+#      --model_name_or_path ${model_path} \
+#      --ref_model ${initial_model} \
+#      --learning_rate 2e-7 \
+#      --max_steps 1200 \
+#      --choose_type max_min \
+#      --train_dir ${output_reward} \
+#      --eval_dir ${output_reward} \
+#      --loss_type sigmoid \
+#      --lr_scheduler_type cosine \
+#      --beta ${dpo_beta}
+
+
+
 
     # lora merge
     echo "merge"
@@ -162,10 +181,10 @@ last_predict() {
 
 
 # Main loop for iterations
-for i in {1..2}
+for i in {1..3}
 #for i in 1
 do
-    echo ${i}
+    echo "i="${i}
     iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
     input_prompt=${prompt_path} # json format
     dataset_key=${dataset_key}
@@ -188,7 +207,7 @@ echo "end loop"
 echo "last predict"
 
 i=$((i+1))
-echo ${i}
+echo "i="${i}
 iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
 input_prompt=${prompt_path} # json format
 dataset_key=${dataset_key}
