@@ -29,19 +29,22 @@ original_df["prompt"] = original_df["input"]
 reward_files = [x for x in os.listdir("./predicts") if x.startswith(iteration_prefix) and x.endswith("_reward.json")] 
 
 dfs = []
-for reward in reward_files:
+for reward in sorted(reward_files):
     print(reward)
+    suffix = reward.split('_')[-2]
     df = pd.read_json(f"{predict_dir}/{reward}")
-    df['prompt'] = df['instances'].apply(lambda x: x['prompt'])
-    df['responses'] = df['instances'].apply(lambda x: x['responses'])
-    df['rewards'] = df['instances'].apply(lambda x: x['rewards'])
-    df['avg_rewards'] = df['rewards'].apply(lambda x: np.mean(x))
+    df["prompt"] = df['instances'].apply(lambda x: x['prompt'])
+    df[f"responses_{suffix}"] = df['instances'].apply(lambda x: x['responses'])
+    df[f"rewards_{suffix}"] = df['instances'].apply(lambda x: x['rewards'])
+    df[f"avg_rewards_{suffix}"] = df[f"rewards_{suffix}"].apply(lambda x: np.mean(x))
+    use_columns = ["prompt", f"responses_{suffix}",f"rewards_{suffix}", f"avg_rewards_{suffix}"]
     dfs.append(df[use_columns])
 
 merged_df = original_df
 
 for i, df in enumerate(dfs):
-    merged_df = merged_df.merge(df, on="prompt", suffixes=(f'_{i}', f'_{i+1}'))
+#    merged_df = merged_df.merge(df, on="prompt", suffixes=(f'_{i}', f'_{i+1}'))
+    merged_df = merged_df.merge(df, on="prompt")
 
 merged_df['original_index'] = merged_df.index
 explode_columns = [x for x in merged_df.columns if x.startswith('responses_') or x.startswith('rewards_')]
