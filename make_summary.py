@@ -27,9 +27,10 @@ original_df = datasets.load_from_disk(input_prompt).to_pandas().drop_duplicates(
 original_df["prompt"] = original_df["input"]
 
 reward_files = [x for x in os.listdir("./predicts") if x.startswith(iteration_prefix) and x.endswith("_reward.json")] 
+sorted_files = sorted(reward_files, key=lambda s: int(s.split("_")[-2]))
 
 dfs = []
-for reward in sorted(reward_files):
+for reward in sorted_files:
     print(reward)
     suffix = reward.split('_')[-2]
     df = pd.read_json(f"{predict_dir}/{reward}")
@@ -50,10 +51,5 @@ merged_df['original_index'] = merged_df.index
 explode_columns = [x for x in merged_df.columns if x.startswith('responses_') or x.startswith('rewards_')]
 sort_columns = ['original_index'] + [x for x in merged_df.columns if x.startswith('rewards')]
 ascendings = [True] + [False] * (len(sort_columns) - 1)
-#print(sort_columns)
 
-#print(merged_df.explode(explode_columns).sort_values(sort_columns, ascending=ascendings))
-
-#print(merged_df.head(2).explode(explode_columns).sort_values(sort_columns).drop(columns=['original_index', 'input']))
 merged_df.explode(explode_columns).sort_values(sort_columns, ascending=ascendings).drop(columns=['original_index', 'input']).to_csv(f"{iteration_prefix}_summary.csv", index=False)
-#merged_df.explode(explode_columns).drop(columns=['original_index', 'input']).to_csv(f"{iteration_prefix}_summary.csv", index=False)
