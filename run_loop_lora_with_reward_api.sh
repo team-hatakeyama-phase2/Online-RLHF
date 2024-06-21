@@ -29,8 +29,8 @@ dataset_key="input"
 
 #reward_model_path=/content/drive/MyDrive/Geniac/RLHFlow_reward_modeling/RLHF-Reward-Modeling/marged_model_full
 # reward_model_path=/content/drive/MyDrive/Geniac/RLHFlow_reward_modeling/RLHF-Reward-Modeling/llama3_rm
-reward_model_path=/storage5/takagi/models/mistral_rm
-#reward_model_path=/storage5/takagi/models/swallow_mx_rm_lora
+#reward_model_path=/storage5/takagi/models/mistral_rm
+reward_model_path=/storage5/takagi/models/swallow_mx_rm_lora
 
 function get_last_dir() {
   path=$1
@@ -58,6 +58,45 @@ mkdir ${model_dir}
 
 iteration_prefix=${model_info}_${prompt_info}_${reward_info}_${dpo_beta}
 
+generate_and_reward() {
+
+    local iteration_name=$1
+    local model_path=$2
+    local input_promt=$3
+    local output_generate=$4
+    local output_reward=$5
+
+    # sampling
+    echo "sampling"
+    python ./generation/get_hf2.py \
+      --model_name_or_path ${model_path} \
+      --dataset_name_or_path ${input_prompt} \
+      --dataset_key ${dataset_key} \
+      --output_dir ${output_generate} \
+      --K 4 \
+      --temperature 1.0 \
+      --local_index 0 \
+      --my_world_size ${my_world_size} \
+      --eos_ids 6 &
+#      --eos_ids 128009 &
+
+    wait
+    python ./generation/merge_data.py \
+      --base_path ${output_generate} \
+      --output_dir ${output_generate} \
+      --num_datasets ${my_world_size}
+
+    # reward
+    echo "reward"
+#    accelerate launch ./annotate_data/get_rewards.py \
+    python ./annotate_data/get_rewards_with_api.py \
+       --dataset_name_or_path ${output_generate} \
+       --output_dir ${output_reward} \
+       --reward_name_or_path ${reward_model_path} \
+       --K 4
+}
+
+
 
 # Function to run a set of operations for a model iteration
 run_iteration() {
@@ -73,34 +112,7 @@ run_iteration() {
     echo "output_generate ${output_generate}"
     echo "output_reward ${output_reward}"
 
-#    # sampling
-#    echo "sampling"
-#    python ./generation/get_hf2.py \
-#      --model_name_or_path ${model_path} \
-#      --dataset_name_or_path ${input_prompt} \
-#      --dataset_key ${dataset_key} \
-#      --output_dir ${output_generate} \
-#      --K 4 \
-#      --temperature 1.0 \
-#      --local_index 0 \
-#      --my_world_size ${my_world_size} \
-#      --eos_ids 6 &
-##      --eos_ids 128009 &
-#
-#    wait
-#    python ./generation/merge_data.py \
-#      --base_path ${output_generate} \
-#      --output_dir ${output_generate} \
-#      --num_datasets ${my_world_size}
-#
-#    # reward
-#    echo "reward"
-##    python ./annotate_data/get_rewards_with_api.py \
-#    accelerate launch ./annotate_data/get_rewards.py \
-#       --dataset_name_or_path ${output_generate} \
-#       --output_dir ${output_reward} \
-#       --reward_name_or_path ${reward_model_path} \
-#       --K 4
+    generate_and_reward ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
 
     # train
     echo "train"
@@ -145,39 +157,13 @@ last_predict() {
     echo "output_generate ${output_generate}"
     echo "output_reward ${output_reward}"
 
-    # sampling
-    echo "sampling"
-    python ./generation/get_hf2.py \
-      --model_name_or_path ${model_path} \
-      --dataset_name_or_path ${input_prompt} \
-      --dataset_key ${dataset_key} \
-      --output_dir ${output_generate} \
-      --K 4 \
-      --temperature 1.0 \
-      --local_index 0 \
-      --my_world_size ${my_world_size} \
-      --eos_ids 128009 &
-
-    wait
-    python ./generation/merge_data.py \
-      --base_path ${output_generate} \
-      --output_dir ${output_generate} \
-      --num_datasets ${my_world_size}
-
-    # reward
-    echo "reward"
-    accelerate launch \
-    ./annotate_data/get_rewards.py \
-      --dataset_name_or_path ${output_generate} \
-      --output_dir ${output_reward} \
-      --reward_name_or_path ${reward_model_path} \
-      --K 4
+    generate_and_reward ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
 }
 
 
 # Main loop for iterations
-#for i in {1..3}
-for i in 1
+for i in {1..2}
+#for i in 1
 do
     echo ${i}
     iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
@@ -199,21 +185,21 @@ done
 
 echo "end loop"
 
-#echo "last predict"
-#
-#i=$((i+1))
-#echo ${i}
-#iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
-#input_prompt=${prompt_path} # json format
-#dataset_key=${dataset_key}
-#output_generate="${predict_dir}/${iteration_prefix}_${i}.json"
-#output_reward="${predict_dir}/${iteration_prefix}_${i}_reward.json"
-#
-#last_predict ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
-#
-#python make_summary.py \
-#  --input_prompt ${input_prompt} \
-#  --predict_dir ${predict_dir} \
-#  --iteration_prefix ${iteration_prefix}
-#
-#echo "dump at "${iteration_prefix}_summary.csv
+echo "last predict"
+
+i=$((i+1))
+echo ${i}
+iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
+input_prompt=${prompt_path} # json format
+dataset_key=${dataset_key}
+output_generate="${predict_dir}/${iteration_prefix}_${i}.json"
+output_reward="${predict_dir}/${iteration_prefix}_${i}_reward.json"
+
+last_predict ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
+
+python make_summary.py \
+  --input_prompt ${input_prompt} \
+  --predict_dir ${predict_dir} \
+  --iteration_prefix ${iteration_prefix}
+
+echo "dump at "${iteration_prefix}_summary.csv

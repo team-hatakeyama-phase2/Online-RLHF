@@ -86,21 +86,31 @@ llm = LLM(
     max_model_len=script_args.max_new_tokens,
     load_format="auto",
     seed=42,
-    gpu_memory_utilization=0.8,
+    gpu_memory_utilization=0.95,
     trust_remote_code=True,
+#    tensor_parallel_size=2,
+#    quantization="awq",
+    swap_space=70,
+#    swap_space=1,
 )
 
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 
 sampling_params = SamplingParams(
     temperature=script_args.temperature,
-    top_p=1.0,
-    max_tokens=script_args.max_new_tokens,
+#    top_p=1.0,
+#    max_tokens=script_args.max_new_tokens,
     n=script_args.K,
     stop_token_ids=[tokenizer.eos_token_id] + script_args.eos_ids,
     #stop=["<|user|>"],
+#    top_p=0.9,
+#    top_k=1,
+#    max_tokens=512
 )
 
+
+print("stop_token_ids")
+print(tokenizer.eos_token_id)
 
 # ds = load_dataset(script_args.dataset_name_or_path, split="train")
 # ds = load_dataset(script_args.dataset_name_or_path, split="test")
@@ -137,6 +147,7 @@ for i, output in enumerate(outputs):
     tmp_data = {"prompt": prompts[i], "responses": [out.text for out in output.outputs]}
     gathered_data.append(tmp_data)
 
+print("last tmp_data", tmp_data)
 
 output_eval_dataset = {}
 output_eval_dataset["type"] = "text_only"

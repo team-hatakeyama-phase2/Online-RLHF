@@ -193,7 +193,7 @@ if __name__ == "__main__":
         script_args.model_name_or_path,
         # use_flash_attention_2=True,
         torch_dtype=torch.float16,
-#        load_in_4bit=True,
+        load_in_4bit=True,
         trust_remote_code=True,
     )
     model.config.use_cache = False
