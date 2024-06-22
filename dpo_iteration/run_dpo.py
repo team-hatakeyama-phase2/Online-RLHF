@@ -193,7 +193,7 @@ if __name__ == "__main__":
         script_args.model_name_or_path,
         # use_flash_attention_2=True,
         torch_dtype=torch.float16,
-        load_in_4bit=True,
+        #load_in_4bit=True,
         trust_remote_code=True,
     )
     model.config.use_cache = False
@@ -213,7 +213,7 @@ if __name__ == "__main__":
         ref_name,
         torch_dtype=torch.bfloat16,
         # use_flash_attention_2=True,
-        load_in_4bit=True,
+        #load_in_4bit=True,
         trust_remote_code=True,
     )
     tokenizer = AutoTokenizer.from_pretrained(script_args.model_name_or_path)
@@ -323,7 +323,7 @@ if __name__ == "__main__":
         max_length=script_args.max_length,
         mask_prompt=script_args.mask_prompt,
         len_penalty=script_args.len_penalty,
-        peft_config=peft_config,
+        #peft_config=peft_config,
         # callbacks=[ClearCacheCallback()],
     )
     print("begin to train")

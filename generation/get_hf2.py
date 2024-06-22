@@ -98,19 +98,19 @@ tokenizer = AutoTokenizer.from_pretrained(model_path)
 
 sampling_params = SamplingParams(
     temperature=script_args.temperature,
-#    top_p=1.0,
-#    max_tokens=script_args.max_new_tokens,
+    top_p=1.0,
+    max_tokens=script_args.max_new_tokens,
     n=script_args.K,
     stop_token_ids=[tokenizer.eos_token_id] + script_args.eos_ids,
     #stop=["<|user|>"],
+    stop=["### 指示:\n"],
 #    top_p=0.9,
 #    top_k=1,
 #    max_tokens=512
 )
 
 
-print("stop_token_ids")
-print(tokenizer.eos_token_id)
+print("stop_token_ids", tokenizer.eos_token_id)
 
 # ds = load_dataset(script_args.dataset_name_or_path, split="train")
 # ds = load_dataset(script_args.dataset_name_or_path, split="test")
@@ -130,6 +130,7 @@ data_size = len(ds["prompt"])
 one_num_share = int(data_size / script_args.my_world_size)
 # ds = ds.select(np.arange(script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share))
 ds = ds.select(np.arange(0, 100))
+#ds = ds.select(np.arange(0, 1000))
 
 print([script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share])
 print(ds, script_args.dataset_name_or_path)

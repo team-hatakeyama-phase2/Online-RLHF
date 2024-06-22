@@ -21,16 +21,19 @@ initial_model=lightblue/karasu-1.1B
 # initial_model=JINIAC/JINIAC-5B-sft_configuration-3_prod-checkpoint-500-dpo_merge_20240526_final
 # initial_model=JINIAC/JINIAC-5B-sft_configuration-3_prod-checkpoint-500-dpo_merge_20240526_final
 
-prompt_path="/storage5/takagi/datasets/ELYZA-tasks-100"
-dataset_key="input"
-
-#prompt_path="/content/drive/MyDrive/Geniac/datasets/hh-rlhf-12k-ja_mod"
+#prompt_path="/storage5/takagi/datasets/ELYZA-tasks-100"
 #dataset_key="input"
+
+#prompt_path="/storage5/takagi/datasets/hh-rlhf-12k-ja_mod"
+#dataset_key="input"
+
+prompt_path="/storage5/takagi/datasets/hh-rlhf-12k-ja_alpaca"
+dataset_key="input"
 
 #reward_model_path=/content/drive/MyDrive/Geniac/RLHFlow_reward_modeling/RLHF-Reward-Modeling/marged_model_full
 # reward_model_path=/content/drive/MyDrive/Geniac/RLHFlow_reward_modeling/RLHF-Reward-Modeling/llama3_rm
-#reward_model_path=/storage5/takagi/models/mistral_rm
-reward_model_path=/storage5/takagi/models/swallow_mx_rm_lora
+reward_model_path=/storage5/takagi/models/mistral_rm
+#reward_model_path=/storage5/takagi/models/swallow_mx_rm_lora
 
 function get_last_dir() {
   path=$1
@@ -77,7 +80,7 @@ generate_and_reward() {
       --temperature 1.0 \
       --local_index 0 \
       --my_world_size ${my_world_size} \
-      --max_new_tokens 512 \
+      --max_new_tokens 2048 \
       --eos_ids 6 &
 #      --eos_ids 128009 &
 
@@ -89,8 +92,8 @@ generate_and_reward() {
 
     # reward
     echo "reward"
-#    accelerate launch ./annotate_data/get_rewards.py \
-    python ./annotate_data/get_rewards_with_api.py \
+#    python ./annotate_data/get_rewards_with_api.py \
+    accelerate launch ./annotate_data/get_rewards.py \
        --dataset_name_or_path ${output_generate} \
        --output_dir ${output_reward} \
        --reward_name_or_path ${reward_model_path} \
@@ -125,7 +128,7 @@ run_iteration() {
       --model_name_or_path ${model_path} \
       --ref_model ${initial_model} \
       --learning_rate 2e-7 \
-      --max_steps 1200 \
+      --num_train_epochs 1 \
       --choose_type max_min \
       --train_dir ${output_reward} \
       --eval_dir ${output_reward} \
@@ -217,6 +220,9 @@ output_generate="${predict_dir}/${iteration_prefix}_${i}.json"
 output_reward="${predict_dir}/${iteration_prefix}_${i}_reward.json"
 
 last_predict ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
+
+sleep 10
+echo "make_csv"
 
 python make_summary.py \
   --input_prompt ${input_prompt} \
