@@ -115,11 +115,15 @@ print("stop_token_ids", tokenizer.eos_token_id)
 # ds = load_dataset(script_args.dataset_name_or_path, split="train")
 # ds = load_dataset(script_args.dataset_name_or_path, split="test")
 ds = load_from_disk(script_args.dataset_name_or_path)
-# ds = ds.map(
-#     lambda x: {
-#         "prompt": tokenizer.apply_chat_template(x[script_args.dataset_key], tokenize=False, add_generation_prompt=True)
-#     }
-# )
+
+## with chat templage
+#ds = ds.map(
+#    lambda x: {
+#        "prompt": tokenizer.apply_chat_template(x[script_args.dataset_key], tokenize=False, add_generation_prompt=True)
+#    }
+#)
+
+# without chat template
 ds = ds.map(
     lambda x: {
         "prompt": x[script_args.dataset_key]
@@ -129,7 +133,10 @@ ds = ds.map(
 data_size = len(ds["prompt"])
 one_num_share = int(data_size / script_args.my_world_size)
 # ds = ds.select(np.arange(script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share))
-ds = ds.select(np.arange(0, 100))
+#ds = ds.select(np.arange(0, 100))
+#ds = ds.select(np.arange(0, 300))
+ds = ds.select(np.arange(0, 400))
+#ds = ds.select(np.arange(0, 1000))
 #ds = ds.select(np.arange(0, 1000))
 
 print([script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share])
