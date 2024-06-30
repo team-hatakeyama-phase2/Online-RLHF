@@ -235,6 +235,7 @@ class PreferenceTrainer(DPOTrainer):
         compute_metrics: Optional[Callable[[EvalLoopOutput], Dict]] = None,
         mask_prompt: Optional[bool] = False,
         len_penalty: float = 0,
+        precompute_ref_log_probs: bool = False,
     ):
 
         if data_collator is None:
