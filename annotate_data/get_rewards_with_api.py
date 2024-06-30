@@ -48,6 +48,14 @@ class ScriptArguments:
         default=8,
         metadata={"help": "the number of responses per prompt"},
     )
+    reward_api_hostname: Optional[str] = field(
+        default="slurm0-a3-ghpc-1",
+        metadata={"help": "hostname of reward_api"},
+    )
+    reward_api_port: Optional[int] = field(
+        default=8000,
+        metadata={"help": "port of reward_api"},
+    )
 
 
 accelerator = Accelerator()
@@ -61,6 +69,8 @@ ds_dir = script_args.dataset_name_or_path
 ds = load_dataset("json", data_files=ds_dir, split="train", field="instances")
 
 reward_name_or_path = script_args.reward_name_or_path
+reward_api_hostname = script_args.reward_api_hostname
+reward_api_port = script_args.reward_api_port
 
 
 """
@@ -73,7 +83,8 @@ We process the data format here and query the reward model to get the rewards.
 #     return rewards
 
 def get_reward_from_api(test_texts):
-    url = f"http://slurm0-a3-ghpc-1:8000/classify/{reward_name_or_path.split('/')[-1]}"
+    url = f"http://{reward_api_hostname}:{reward_api_port}:/classify/{reward_name_or_path.split('/')[-1]}"
+    #url = f"http://slurm0-a3-ghpc-1:8000/classify/{reward_name_or_path.split('/')[-1]}"
     #url = f"http://slurm0-a3-ghpc-0:8000/classify/{reward_name_or_path.split('/')[-1]}"
     headers = {"Content-Type": "application/json"}
     input_json = {

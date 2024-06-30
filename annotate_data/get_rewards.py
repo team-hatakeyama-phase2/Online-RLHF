@@ -138,9 +138,9 @@ data_to_send = {
 }
 
 import torch.distributed as dist
-import os
 
-## !add
+## If you use a single GPU, you will need the following:
+#import os
 #os.environ['RANK'] = '0'
 #os.environ['WORLD_SIZE'] = '1'
 #os.environ['MASTER_ADDR'] = 'localhost'
