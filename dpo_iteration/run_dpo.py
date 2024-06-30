@@ -314,7 +314,6 @@ if __name__ == "__main__":
         mask_prompt=script_args.mask_prompt,
         len_penalty=script_args.len_penalty,
         # callbacks=[ClearCacheCallback()],
-        precompute_ref_log_probs=True,
 
     )
     print("begin to train")

@@ -4,14 +4,14 @@
 # eval "$(conda shell.bash hook)"
 
 
-my_world_size=1 # how many gpu you use
+my_world_size=4 # n parallel
 
 # Base paths and settings
 # initial_model="TODO: Set initial model path here"
 #initial_model=TinyLlama/TinyLlama_v1.1
 #initial_model=llm-jp/llm-jp-1.3b-v1.0
 #initial_model=lightblue/karasu-1.1B
-initial_model=CohereForAI/c4ai-command-r-v01
+#initial_model=CohereForAI/c4ai-command-r-v01
 
 #initial_model=meta-llama/Meta-Llama-3-8B-Instruct
 #initial_model=EleutherAI/gpt-neox-20b
@@ -23,6 +23,9 @@ initial_model=CohereForAI/c4ai-command-r-v01
 #initial_model=JINIAC/JINIAC-5B-sft_configuration-3_prod-checkpoint-500-dpo_merge_20240526_final
 #initial_model=JINIAC/JINIAC-5B-sft_configuration-3_prod-checkpoint-500-dpo_merge_20240526_final
 #initial_model=llm-jp/llm-jp-13b-instruct-full-dolly-ichikara_004_001_single-oasst-oasst2-v2.0
+initial_model=tokyotech-llm/Swallow-MX-8x7b-NVE-v0.1
+#initial_model=tokyotech-llm/Swallow-70b-hf
+#initial_model=stockmark/stockmark-100b
 
 
 #prompt_path="/storage5/takagi/datasets/ELYZA-tasks-100"
@@ -41,8 +44,8 @@ dataset_key="input"
 #dataset_key="context_messages"
 
 
-#reward_model_path=/storage5/takagi/models/mistral_rm
-reward_model_path=/storage5/takagi/models/swallow_mx_rm_lora
+reward_model_path=/storage5/takagi/models/mistral_rm
+#reward_model_path=/storage5/takagi/models/swallow_mx_rm_lora
 #reward_model_path=sfairXC/FsfairX-LLaMA3-RM-v0.1
 
 function get_last_dir() {
@@ -58,6 +61,7 @@ model_info=$(get_last_dir ${initial_model})
 prompt_info=$(get_last_dir ${prompt_path})
 reward_info=$(get_last_dir ${reward_model_path})
 dpo_beta=0.2
+K=4
 
 echo "model:"${model_info}
 echo "prompt:"${prompt_info}
@@ -81,50 +85,54 @@ generate_and_reward() {
 
     # sampling
     echo "sampling"
-    CUDA_VISIBLE_DEVICES=0 python ./generation/get_hf2.py \
+    CUDA_VISIBLE_DEVICES=0,1 python ./generation/get_hf2.py \
       --model_name_or_path ${model_path} \
       --dataset_name_or_path ${input_prompt} \
       --dataset_key ${dataset_key} \
       --output_dir ${output_generate} \
-      --K 4 \
+      --K ${K} \
       --temperature 1.0 \
       --local_index 0 \
       --my_world_size ${my_world_size} \
       --max_new_tokens 2048 \
+      --tensor_parallel_size 2 \
       --eos_ids 6 &
-#    CUDA_VISIBLE_DEVICES=1 python ./generation/get_hf2.py \
-#      --model_name_or_path ${model_path} \
-#      --dataset_name_or_path ${input_prompt} \
-#      --dataset_key ${dataset_key} \
-#      --output_dir ${output_generate} \
-#      --K 4 \
-#      --temperature 1.0 \
-#      --local_index 1 \
-#      --my_world_size ${my_world_size} \
-#      --max_new_tokens 2048 \
-#      --eos_ids 6 &
-#    CUDA_VISIBLE_DEVICES=2 python ./generation/get_hf2.py \
-#      --model_name_or_path ${model_path} \
-#      --dataset_name_or_path ${input_prompt} \
-#      --dataset_key ${dataset_key} \
-#      --output_dir ${output_generate} \
-#      --K 4 \
-#      --temperature 1.0 \
-#      --local_index 2 \
-#      --my_world_size ${my_world_size} \
-#      --max_new_tokens 2048 \
-#      --eos_ids 6 &
-#    CUDA_VISIBLE_DEVICES=3 python ./generation/get_hf2.py \
-#      --model_name_or_path ${model_path} \
-#      --dataset_name_or_path ${input_prompt} \
-#      --dataset_key ${dataset_key} \
-#      --output_dir ${output_generate} \
-#      --K 4 \
-#      --temperature 1.0 \
-#      --local_index 3 \
-#      --my_world_size ${my_world_size} \
-#      --max_new_tokens 2048 \
-#      --eos_ids 6 &
+    CUDA_VISIBLE_DEVICES=2,3 python ./generation/get_hf2.py \
+      --model_name_or_path ${model_path} \
+      --dataset_name_or_path ${input_prompt} \
+      --dataset_key ${dataset_key} \
+      --output_dir ${output_generate} \
+      --K ${K} \
+      --temperature 1.0 \
+      --local_index 1 \
+      --my_world_size ${my_world_size} \
+      --max_new_tokens 2048 \
+      --tensor_parallel_size 2 \
+      --eos_ids 6 &
+    CUDA_VISIBLE_DEVICES=4,5 python ./generation/get_hf2.py \
+      --model_name_or_path ${model_path} \
+      --dataset_name_or_path ${input_prompt} \
+      --dataset_key ${dataset_key} \
+      --output_dir ${output_generate} \
+      --K ${K} \
+      --temperature 1.0 \
+      --local_index 2 \
+      --my_world_size ${my_world_size} \
+      --max_new_tokens 2048 \
+      --tensor_parallel_size 2 \
+      --eos_ids 6 &
+    CUDA_VISIBLE_DEVICES=6,7 python ./generation/get_hf2.py \
+      --model_name_or_path ${model_path} \
+      --dataset_name_or_path ${input_prompt} \
+      --dataset_key ${dataset_key} \
+      --output_dir ${output_generate} \
+      --K ${K} \
+      --temperature 1.0 \
+      --local_index 3 \
+      --my_world_size ${my_world_size} \
+      --max_new_tokens 2048 \
+      --tensor_parallel_size 2 \
+      --eos_ids 6 &
 
     wait
     python ./generation/merge_data.py \
@@ -134,12 +142,12 @@ generate_and_reward() {
 
     # reward
     echo "reward"
-    accelerate launch ./annotate_data/get_rewards.py \
     python ./annotate_data/get_rewards_with_api.py \
        --dataset_name_or_path ${output_generate} \
        --output_dir ${output_reward} \
        --reward_name_or_path ${reward_model_path} \
-       --K 4
+       --reward_api_hostname slurm0-a3-ghpc-6 \
+       --K ${K}
 }
 
 
