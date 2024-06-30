@@ -14,6 +14,7 @@ my_world_size=1 # how many gpu you use
 initial_model=CohereForAI/c4ai-command-r-v01
 
 #initial_model=meta-llama/Meta-Llama-3-8B-Instruct
+#initial_model=EleutherAI/gpt-neox-20b
 
 # initial_model=hatakeyama-llm-team/Tanuki-8B-Instruct-without-DPO
 # initial_model=nk2t/Llama-3-8B-Instruct-japanese-nk2t-v0.3
@@ -22,6 +23,8 @@ initial_model=CohereForAI/c4ai-command-r-v01
 # initial_model="hatakeyama-llm-team/Tanuki-8B-Instruct"
 # initial_model=JINIAC/JINIAC-5B-sft_configuration-3_prod-checkpoint-500-dpo_merge_20240526_final
 # initial_model=JINIAC/JINIAC-5B-sft_configuration-3_prod-checkpoint-500-dpo_merge_20240526_final
+#initial_model=llm-jp/llm-jp-13b-instruct-full-dolly-ichikara_004_001_single-oasst-oasst2-v2.0
+
 
 #prompt_path="/storage5/takagi/datasets/ELYZA-tasks-100"
 #dataset_key="input"
@@ -90,7 +93,7 @@ generate_and_reward() {
       --temperature 1.0 \
       --local_index 0 \
       --my_world_size ${my_world_size} \
-      --max_new_tokens 128 \
+      --max_new_tokens 2048 \
       --eos_ids 6 &
 #    CUDA_VISIBLE_DEVICES=1 python ./generation/get_hf2.py \
 #      --model_name_or_path ${model_path} \
@@ -135,8 +138,8 @@ generate_and_reward() {
 
     # reward
     echo "reward"
-#    accelerate launch ./annotate_data/get_rewards.py \
-    python ./annotate_data/get_rewards_with_api.py \
+#    python ./annotate_data/get_rewards_with_api.py \
+    accelerate launch ./annotate_data/get_rewards.py \
        --dataset_name_or_path ${output_generate} \
        --output_dir ${output_reward} \
        --reward_name_or_path ${reward_model_path} \
@@ -176,11 +179,11 @@ run_iteration() {
       --choose_type max_min \
       --train_dir ${output_reward} \
       --eval_dir ${output_reward} \
-      --eval_steps 10 \
+      --eval_steps 1 \
       --loss_type sigmoid \
       --lr_scheduler_type cosine \
       --warmup_steps 10 \
-      --gradient_accumulation_steps 16 \
+      --gradient_accumulation_steps 8 \
       --save_strategy no \
       --beta ${dpo_beta}
 

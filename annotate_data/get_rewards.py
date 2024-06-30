@@ -140,13 +140,13 @@ data_to_send = {
 import torch.distributed as dist
 import os
 
-# !add
-os.environ['RANK'] = '0'
-os.environ['WORLD_SIZE'] = '1'
-os.environ['MASTER_ADDR'] = 'localhost'
-os.environ['MASTER_PORT'] = '12355'
-
-dist.init_process_group(backend='nccl', init_method='env://')
+## !add
+#os.environ['RANK'] = '0'
+#os.environ['WORLD_SIZE'] = '1'
+#os.environ['MASTER_ADDR'] = 'localhost'
+#os.environ['MASTER_PORT'] = '12355'
+#
+#dist.init_process_group(backend='nccl', init_method='env://')
 
 dist.all_gather_object(all_process_list, data_to_send)
 gathered_data = []

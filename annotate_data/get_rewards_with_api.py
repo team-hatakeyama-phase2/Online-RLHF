@@ -74,6 +74,7 @@ We process the data format here and query the reward model to get the rewards.
 
 def get_reward_from_api(test_texts):
     url = f"http://slurm0-a3-ghpc-1:8000/classify/{reward_name_or_path.split('/')[-1]}"
+    #url = f"http://slurm0-a3-ghpc-0:8000/classify/{reward_name_or_path.split('/')[-1]}"
     headers = {"Content-Type": "application/json"}
     input_json = {
         "prompt": test_texts,

@@ -182,6 +182,7 @@ def prepare_data(
         dataset = dataset.select(range(min(len(dataset), 100))) # eval
     else:
         dataset = dataset.select(range(100, len(dataset))) # train
+        #dataset = dataset.select(range(100, 300)) # train 検証用
     
     return dataset
 
@@ -190,13 +191,56 @@ if __name__ == "__main__":
     parser = HfArgumentParser(ScriptArguments)
     script_args = parser.parse_args_into_dataclasses()[0]
 
+#    os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"  # GPU 0, 1, 2を使用
+
     # 1. load a pretrained model
+
+
+#    ds_config = {
+#        "zero_optimization": {
+#            "stage": 0,
+#            "offload_param": {
+#                "device": "cpu",
+#            },
+#        },
+#        "bf16": {
+#            "enabled": True,
+#        },
+#        "gradient_clipping": 1.0,
+#        "prescale_gradients": False,
+#        "wall_clock_breakdown": False,
+#    }
+#
+#    if script_args.ref_model:
+#        ref_name = script_args.ref_model
+#    else:
+#        ref_name = script_args.model_name_or_path
+#
+#    model_ref = AutoModelForCausalLM.from_pretrained(
+#        ref_name,
+#        torch_dtype=torch.bfloat16,
+#        #torch_dtype=torch.float16,
+#        use_flash_attention_2=True,
+#        #load_in_4bit=True,
+#        trust_remote_code=True,
+#        #device_map='cpu',
+#        #device_map=torch.device("cuda:7"),
+#        #device_map=torch.device("cuda:0"),
+#        #ds_config,
+#        )
+#
+#    print("=====================loaded ref model====================")
+
+
+
     model = AutoModelForCausalLM.from_pretrained(
         script_args.model_name_or_path,
-        # use_flash_attention_2=True,
-        torch_dtype=torch.float16,
+        use_flash_attention_2=True,
+        torch_dtype=torch.bfloat16,
         #load_in_4bit=True,
         trust_remote_code=True,
+        #device_map="auto",
+        #device_map=torch.device("cuda:1"),
     )
     model.config.use_cache = False
 
@@ -214,10 +258,15 @@ if __name__ == "__main__":
     model_ref = AutoModelForCausalLM.from_pretrained(
         ref_name,
         torch_dtype=torch.bfloat16,
-        # use_flash_attention_2=True,
+        use_flash_attention_2=True,
         #load_in_4bit=True,
         trust_remote_code=True,
-    )
+        ##device_map='cpu',
+        #device_map=torch.device("cuda:7"),
+        #device_map=torch.device("cuda:2"),
+        )#.to("cuda:2")
+
+
     tokenizer = AutoTokenizer.from_pretrained(script_args.model_name_or_path)
     if script_args.eos_padding:
         tokenizer.pad_token = tokenizer.eos_token
@@ -307,6 +356,8 @@ if __name__ == "__main__":
         mask_prompt=script_args.mask_prompt,
         len_penalty=script_args.len_penalty,
         # callbacks=[ClearCacheCallback()],
+        precompute_ref_log_probs=True,
+
     )
     print("begin to train")
 

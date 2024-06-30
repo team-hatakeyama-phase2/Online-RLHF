@@ -10,8 +10,10 @@ my_world_size=1 # how many gpu you use
 # initial_model="TODO: Set initial model path here"
 # initial_model=TinyLlama/TinyLlama_v1.1
 # initial_model=llm-jp/llm-jp-1.3b-v1.0
-initial_model=lightblue/karasu-1.1B
+#initial_model=lightblue/karasu-1.1B
 #initial_model=CohereForAI/c4ai-command-r-v01
+
+initial_model=meta-llama/Meta-Llama-3-8B-Instruct
 
 # initial_model=hatakeyama-llm-team/Tanuki-8B-Instruct-without-DPO
 # initial_model=nk2t/Llama-3-8B-Instruct-japanese-nk2t-v0.3
@@ -27,13 +29,21 @@ initial_model=lightblue/karasu-1.1B
 #prompt_path="/storage5/takagi/datasets/hh-rlhf-12k-ja_mod"
 #dataset_key="input"
 
-prompt_path="/storage5/takagi/datasets/hh-rlhf-12k-ja_alpaca"
-dataset_key="input"
+#prompt_path="/storage5/takagi/datasets/hh-rlhf-12k-ja_alpaca"
+#dataset_key="input"
+
+#prompt_path="/storage5/takagi/datasets/iterative-prompt-v1-iter1-20K"
+#dataset_key="context_messages"
+
+prompt_path="/storage5/takagi/datasets/test_generation_2k"
+dataset_key="context_messages"
+
 
 #reward_model_path=/content/drive/MyDrive/Geniac/RLHFlow_reward_modeling/RLHF-Reward-Modeling/marged_model_full
 # reward_model_path=/content/drive/MyDrive/Geniac/RLHFlow_reward_modeling/RLHF-Reward-Modeling/llama3_rm
-reward_model_path=/storage5/takagi/models/mistral_rm
+#reward_model_path=/storage5/takagi/models/mistral_rm
 #reward_model_path=/storage5/takagi/models/swallow_mx_rm_lora
+reward_model_path=sfairXC/FsfairX-LLaMA3-RM-v0.1
 
 function get_last_dir() {
   path=$1
@@ -92,8 +102,8 @@ generate_and_reward() {
 
     # reward
     echo "reward"
-#    python ./annotate_data/get_rewards_with_api.py \
-    accelerate launch ./annotate_data/get_rewards.py \
+#    accelerate launch ./annotate_data/get_rewards.py \
+    python ./annotate_data/get_rewards_with_api.py \
        --dataset_name_or_path ${output_generate} \
        --output_dir ${output_reward} \
        --reward_name_or_path ${reward_model_path} \
@@ -116,7 +126,7 @@ run_iteration() {
     echo "output_generate ${output_generate}"
     echo "output_reward ${output_reward}"
 
-    generate_and_reward ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
+#    generate_and_reward ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
 
     # train
     echo "train"
@@ -124,20 +134,27 @@ run_iteration() {
       --config_file ./accelerate_configs/single_gpu.yaml \
       ./dpo_iteration/run_dpo_lora.py \
       --run_name ${iteration_name} \
-      --output_dir ${iteration_name}_lora \
+      --output_dir ${iteration_name} \
       --model_name_or_path ${model_path} \
       --ref_model ${initial_model} \
       --learning_rate 2e-7 \
-      --num_train_epochs 1 \
+      --num_train_epochs 10 \
+      --logging_steps 1 \
       --choose_type max_min \
       --train_dir ${output_reward} \
       --eval_dir ${output_reward} \
+      --eval_steps 10 \
       --loss_type sigmoid \
       --lr_scheduler_type cosine \
+      --warmup_steps 10 \
+      --gradient_accumulation_steps 8 \
+      --save_strategy no \
       --beta ${dpo_beta}
 
 #    accelerate launch \
+#      --config_file ./configs/zero3.yaml \
 #      --config_file ./accelerate_configs/multi_gpu.yaml \
+#      --config_file ./accelerate_configs/single_gpu.yaml \
 #      ./dpo_iteration/run_dpo_lora.py \
 #      --run_name ${iteration_name} \
 #      --output_dir ${iteration_name}_lora \
@@ -152,16 +169,39 @@ run_iteration() {
 #      --lr_scheduler_type cosine \
 #      --beta ${dpo_beta}
 
+#    echo "train"
+#    accelerate launch \
+#      --config_file ./configs/zero2.yaml \
+#      ./dpo_iteration/run_dpo.py \
+#      --run_name ${iteration_name} \
+#      --output_dir ${iteration_name} \
+#      --model_name_or_path ${model_path} \
+#      --ref_model ${initial_model} \
+#      --learning_rate 2e-7 \
+#      --num_train_epochs 3 \
+#      --logging_steps 1 \
+#      --choose_type max_min \
+#      --train_dir ${output_reward} \
+#      --eval_dir ${output_reward} \
+#      --eval_steps 10 \
+#      --loss_type sigmoid \
+#      --lr_scheduler_type cosine \
+#      --warmup_steps 10 \
+#      --gradient_accumulation_steps 16 \
+#      --save_strategy no \
+#      --beta ${dpo_beta}
 
-    # lora merge
-    echo "merge"
-    echo from ${iteration_name}_lora
-    python ./merge_lora.py \
-      --lora_model_path ${iteration_name}_lora \
-      --merged_dir ${iteration_name}
-    cp ./${iteration_name}_lora/tokenizer* ./${iteration_name}/
-    cp ./${iteration_name}_lora/special_tokens_map.json ./${iteration_name}/
 
+
+#    # lora merge
+#    echo "merge"
+#    echo from ${iteration_name}_lora
+#    python ./merge_lora.py \
+#      --lora_model_path ${iteration_name}_lora \
+#      --merged_dir ${iteration_name}
+#    cp ./${iteration_name}_lora/tokenizer* ./${iteration_name}/
+#    cp ./${iteration_name}_lora/special_tokens_map.json ./${iteration_name}/
+#
 }
 
 # Function to run a set of operations for a model iteration
@@ -183,8 +223,9 @@ last_predict() {
 
 
 # Main loop for iterations
-for i in {1..3}
-#for i in 1
+#for i in {1..3}
+#for i in {1..2}
+for i in 1
 do
     echo "i="${i}
     iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
@@ -206,27 +247,27 @@ done
 
 echo "end loop"
 
-echo "last predict"
-
-i=$((i+1))
-echo "i="${i}
-previous_iteration=$((i-1))
-model_path="${model_dir}/${iteration_prefix}/iter${previous_iteration}"
-
-iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
-input_prompt=${prompt_path} # json format
-dataset_key=${dataset_key}
-output_generate="${predict_dir}/${iteration_prefix}_${i}.json"
-output_reward="${predict_dir}/${iteration_prefix}_${i}_reward.json"
-
-last_predict ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
-
-sleep 10
-echo "make_csv"
-
-python make_summary.py \
-  --input_prompt ${input_prompt} \
-  --predict_dir ${predict_dir} \
-  --iteration_prefix ${iteration_prefix}
-
-echo "dump at "${iteration_prefix}_summary.csv
+#echo "last predict"
+#
+#i=$((i+1))
+#echo "i="${i}
+#previous_iteration=$((i-1))
+#model_path="${model_dir}/${iteration_prefix}/iter${previous_iteration}"
+#
+#iteration_name="${model_dir}/${iteration_prefix}/iter${i}"
+#input_prompt=${prompt_path} # json format
+#dataset_key=${dataset_key}
+#output_generate="${predict_dir}/${iteration_prefix}_${i}.json"
+#output_reward="${predict_dir}/${iteration_prefix}_${i}_reward.json"
+#
+#last_predict ${iteration_name} ${model_path} ${input_prompt} ${output_generate} ${output_reward}
+#
+#sleep 10
+#echo "make_csv"
+#
+#python make_summary.py \
+#  --input_prompt ${input_prompt} \
+#  --predict_dir ${predict_dir} \
+#  --iteration_prefix ${iteration_prefix}
+#
+#echo "dump at "${iteration_prefix}_summary.csv

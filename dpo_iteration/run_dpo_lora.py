@@ -180,6 +180,9 @@ def prepare_data(
 
     if sanity_check:
         dataset = dataset.select(range(min(len(dataset), 100)))
+    else:
+        #dataset = dataset.select(range(100, len(dataset))) # train
+        dataset = dataset.select(range(100, 300)) # train 検証用
 
     return dataset
 
@@ -192,7 +195,7 @@ if __name__ == "__main__":
     model = AutoModelForCausalLM.from_pretrained(
         script_args.model_name_or_path,
         # use_flash_attention_2=True,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.bfloat16,
         load_in_4bit=True,
         trust_remote_code=True,
     )
@@ -206,11 +209,11 @@ if __name__ == "__main__":
             name for name, buffer in model.named_buffers() if buffer.dtype == torch.bool
         ]
 
-    if script_args.ref_model:
-        ref_name = script_args.ref_model
-    else:
-        ref_name = script_args.model_name_or_path
-
+#    if script_args.ref_model:
+#        ref_name = script_args.ref_model
+#    else:
+#        ref_name = script_args.model_name_or_path
+#
 #    model_ref = AutoModelForCausalLM.from_pretrained(
 #        ref_name,
 #        torch_dtype=torch.bfloat16,
@@ -218,6 +221,7 @@ if __name__ == "__main__":
 #        load_in_4bit=True,
 #        trust_remote_code=True,
 #    )
+
     tokenizer = AutoTokenizer.from_pretrained(script_args.model_name_or_path)
     if script_args.eos_padding:
         tokenizer.pad_token = tokenizer.eos_token
@@ -317,6 +321,7 @@ if __name__ == "__main__":
         model,
         ref_model=None,
         #ref_model=model_ref,
+        #force_use_ref_model=True,
         args=training_args,
         beta=script_args.beta,
         train_dataset=train_dataset,
