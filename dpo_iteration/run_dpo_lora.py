@@ -13,6 +13,7 @@ from transformers import (
     TrainingArguments,
     TrainerCallback,
 )
+from peft import LoraConfig
 
 @dataclass
 class ScriptArguments:
@@ -178,11 +179,11 @@ def prepare_data(
     dataset = Dataset.from_dict({"prompt": prompts, "chosen": pos, "rejected": neg, "margin": margin})
 
     if sanity_check:
-        dataset = dataset.select(range(min(len(dataset), 100))) # eval
+        dataset = dataset.select(range(min(len(dataset), 100)))
     else:
-        dataset = dataset.select(range(100, len(dataset))) # train
-        #dataset = dataset.select(range(100, 300)) # train 検証用
-    
+        #dataset = dataset.select(range(100, len(dataset))) # train
+        dataset = dataset.select(range(100, 300)) # train 検証用
+
     return dataset
 
 
@@ -190,18 +191,17 @@ if __name__ == "__main__":
     parser = HfArgumentParser(ScriptArguments)
     script_args = parser.parse_args_into_dataclasses()[0]
 
-
     # 1. load a pretrained model
     model = AutoModelForCausalLM.from_pretrained(
         script_args.model_name_or_path,
-        use_flash_attention_2=True,
+        # use_flash_attention_2=True,
         torch_dtype=torch.bfloat16,
-        #load_in_4bit=True,
+        load_in_4bit=True,
         trust_remote_code=True,
-        #device_map="auto",
-        #device_map=torch.device("cuda:1"),
     )
     model.config.use_cache = False
+
+    print(model)
 
     if script_args.ignore_bias_buffers:
         # torch distributed hack
@@ -209,21 +209,18 @@ if __name__ == "__main__":
             name for name, buffer in model.named_buffers() if buffer.dtype == torch.bool
         ]
 
-    if script_args.ref_model:
-        ref_name = script_args.ref_model
-    else:
-        ref_name = script_args.model_name_or_path
-
-    model_ref = AutoModelForCausalLM.from_pretrained(
-        ref_name,
-        torch_dtype=torch.bfloat16,
-        use_flash_attention_2=True,
-        #load_in_4bit=True,
-        trust_remote_code=True,
-        ##device_map='cpu',
-        #device_map=torch.device("cuda:7"),
-        #device_map=torch.device("cuda:2"),
-        )
+#    if script_args.ref_model:
+#        ref_name = script_args.ref_model
+#    else:
+#        ref_name = script_args.model_name_or_path
+#
+#    model_ref = AutoModelForCausalLM.from_pretrained(
+#        ref_name,
+#        torch_dtype=torch.bfloat16,
+#        # use_flash_attention_2=True,
+#        load_in_4bit=True,
+#        trust_remote_code=True,
+#    )
 
     tokenizer = AutoTokenizer.from_pretrained(script_args.model_name_or_path)
     if script_args.eos_padding:
@@ -295,6 +292,26 @@ if __name__ == "__main__":
 
     # 5. initialize the DPO trainer
 
+    # LoRAパラメータ
+    peft_config = LoraConfig(
+        r=64,  # LoRAアテンションの次元
+        lora_alpha=16,  # LoRAスケーリングのAlphaパラメータ
+        lora_dropout=0.1,  # LoRA レイヤーのドロップアウト確率
+        bias="none",  # LoRAのバイアス種別 ("none","all", "lora_only")
+        task_type="CAUSAL_LM",  # タスク種別
+        # target_modules = ['q_proj', 'v_proj', 'o_proj', 'down_proj', 'k_proj', 'gate_proj', 'up_proj']
+        # target_modules = ['c_fc', 'c_proj', 'c_attn']
+        # target_modules = ['up_proj', 'q_proj', 'gate_proj', 'k_proj', 'down_proj', 'v_proj', 'o_proj']
+        # target_modules = ['q_proj', 'k_proj', 'down_proj', 'up_proj', 'o_proj', 'v_proj', 'gate_proj']
+        # target_modules = ['v_proj', 'q_proj', 'k_proj', 'down_proj', 'o_proj', 'gate_proj', 'up_proj']
+        # target_modules = ['gate_up_proj', 'o_proj', 'qkv_proj', 'down_proj']
+        # target_modules = ['o_proj', 'v_proj', 'up_proj', 'gate_proj', 'q_proj', 'k_proj', 'down_proj']
+        # target_modules = ['gate_proj', 'k_proj', 'q_proj', 'o_proj', 'down_proj', 'up_proj', 'v_proj']
+        # target_modules = ['k_proj', 'o_proj', 'v_proj', 'gate_proj', 'q_proj', 'up_proj', 'down_proj'] # tanuki
+        # target_modules = ['q_proj', 'gate_proj', 'up_proj', 'k_proj', 'o_proj', 'down_proj', 'v_proj'] # karasu
+        target_modules = ['q_proj', 'k_proj', 'v_proj', 'o_proj', 'gate_proj', 'up_proj', 'down_proj' ] # commandr
+    )
+
     # memory error対策
     class ClearCacheCallback(TrainerCallback):
         def on_step_end(self, args, state, control, **kwargs):
@@ -302,7 +319,9 @@ if __name__ == "__main__":
 
     dpo_trainer = PreferenceTrainer(
         model,
-        model_ref,
+        ref_model=None,
+        #ref_model=model_ref,
+        #force_use_ref_model=True,
         args=training_args,
         beta=script_args.beta,
         train_dataset=train_dataset,
@@ -313,8 +332,8 @@ if __name__ == "__main__":
         max_length=script_args.max_length,
         mask_prompt=script_args.mask_prompt,
         len_penalty=script_args.len_penalty,
+        peft_config=peft_config,
         # callbacks=[ClearCacheCallback()],
-
     )
     print("begin to train")
 

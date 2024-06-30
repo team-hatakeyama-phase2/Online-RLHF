@@ -1,0 +1,5 @@
+*.csv
+*.pyc
+models/
+predicts/
+wandb/

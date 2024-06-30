@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 import numpy as np
 import torch
-from datasets import load_dataset
+from datasets import load_dataset, load_from_disk
 from transformers import (
     AutoTokenizer,
     HfArgumentParser,
@@ -67,6 +67,14 @@ class ScriptArguments:
         metadata={"help": "the key of the dataset"},
     )
     eos_ids: List[int] = field(default_factory=lambda: [], metadata={"help": "the ids of the end of sentence tokens"})
+    gpu_memory_utilization: Optional[float] = field(
+        default=0.9,
+        metadata={"help": "gpu_memory limit"},
+    )
+    tensor_parallel_size: Optional[int] = field(
+        default=1,
+        metadata={"help": "num of gpu"},
+    )
 
 
 parser = HfArgumentParser(ScriptArguments)
@@ -79,14 +87,22 @@ seed = script_args.seed
 torch.manual_seed(seed)
 np.random.seed(seed)
 
+
 llm = LLM(
     model=model_path,
     tokenizer=model_path,
     dtype="bfloat16",
-    max_model_len=script_args.max_input_length,
+    max_model_len=script_args.max_new_tokens,
     load_format="auto",
     seed=42,
+    gpu_memory_utilization=script_args.gpu_memory_utilization,
+    trust_remote_code=True,
+    tensor_parallel_size=script_args.tensor_parallel_size,
+#    quantization="awq",
+    swap_space=70,
+#    swap_space=1,
 )
+
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 
 sampling_params = SamplingParams(
@@ -96,13 +112,34 @@ sampling_params = SamplingParams(
     n=script_args.K,
     stop_token_ids=[tokenizer.eos_token_id] + script_args.eos_ids,
     #stop=["<|user|>"],
+    stop=["### 指示:\n"],
+#    top_p=0.9,
+#    top_k=1,
+#    max_tokens=512
 )
 
 
-ds = load_dataset(script_args.dataset_name_or_path, split="train")
+print("stop_token_ids", tokenizer.eos_token_id)
+
+# ds = load_dataset(script_args.dataset_name_or_path, split="train")
+# ds = load_dataset(script_args.dataset_name_or_path, split="test")
+ds = load_from_disk(script_args.dataset_name_or_path)
+#ds = ds.select(np.arange(0, 100))
+ds = ds.select(np.arange(0, 300))
+#ds = ds.select(np.arange(0, 400))
+#ds = ds.select(np.arange(0, 1000))
+
+## with chat templage
+#ds = ds.map(
+#    lambda x: {
+#        "prompt": tokenizer.apply_chat_template(x[script_args.dataset_key], tokenize=False, add_generation_prompt=True)
+#    }
+#)
+
+# without chat template
 ds = ds.map(
     lambda x: {
-        "prompt": tokenizer.apply_chat_template(x[script_args.dataset_key], tokenize=False, add_generation_prompt=True)
+        "prompt": x[script_args.dataset_key]
     }
 )
 
@@ -126,6 +163,7 @@ for i, output in enumerate(outputs):
     tmp_data = {"prompt": prompts[i], "responses": [out.text for out in output.outputs]}
     gathered_data.append(tmp_data)
 
+print("last tmp_data", tmp_data)
 
 output_eval_dataset = {}
 output_eval_dataset["type"] = "text_only"

@@ -139,6 +139,15 @@ data_to_send = {
 
 import torch.distributed as dist
 
+## If you use a single GPU, you will need the following:
+#import os
+#os.environ['RANK'] = '0'
+#os.environ['WORLD_SIZE'] = '1'
+#os.environ['MASTER_ADDR'] = 'localhost'
+#os.environ['MASTER_PORT'] = '12355'
+#
+#dist.init_process_group(backend='nccl', init_method='env://')
+
 dist.all_gather_object(all_process_list, data_to_send)
 gathered_data = []
 
@@ -173,3 +182,4 @@ if local_rank == 0:
     if script_args.record_dir is not None:
         with open(script_args.record_dir, "a") as f:
             f.write(str(mean_scores) + "\t" + str(top1_scores) + "\n")
+
