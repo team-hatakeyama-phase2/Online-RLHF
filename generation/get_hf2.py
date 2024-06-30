@@ -67,6 +67,14 @@ class ScriptArguments:
         metadata={"help": "the key of the dataset"},
     )
     eos_ids: List[int] = field(default_factory=lambda: [], metadata={"help": "the ids of the end of sentence tokens"})
+    gpu_memory_utilization: Optional[float] = field(
+        default=0.9,
+        metadata={"help": "gpu_memory limit"},
+    )
+    tensor_parallel_size: Optional[int] = field(
+        default=1,
+        metadata={"help": "num of gpu"},
+    )
 
 
 parser = HfArgumentParser(ScriptArguments)
@@ -79,6 +87,7 @@ seed = script_args.seed
 torch.manual_seed(seed)
 np.random.seed(seed)
 
+
 llm = LLM(
     model=model_path,
     tokenizer=model_path,
@@ -86,9 +95,9 @@ llm = LLM(
     max_model_len=script_args.max_new_tokens,
     load_format="auto",
     seed=42,
-    gpu_memory_utilization=0.95,
+    gpu_memory_utilization=script_args.gpu_memory_utilization,
     trust_remote_code=True,
-#    tensor_parallel_size=2,
+    tensor_parallel_size=script_args.tensor_parallel_size,
 #    quantization="awq",
     swap_space=70,
 #    swap_space=1,
@@ -115,6 +124,10 @@ print("stop_token_ids", tokenizer.eos_token_id)
 # ds = load_dataset(script_args.dataset_name_or_path, split="train")
 # ds = load_dataset(script_args.dataset_name_or_path, split="test")
 ds = load_from_disk(script_args.dataset_name_or_path)
+#ds = ds.select(np.arange(0, 100))
+ds = ds.select(np.arange(0, 300))
+#ds = ds.select(np.arange(0, 400))
+#ds = ds.select(np.arange(0, 1000))
 
 ## with chat templage
 #ds = ds.map(
@@ -132,11 +145,7 @@ ds = ds.map(
 
 data_size = len(ds["prompt"])
 one_num_share = int(data_size / script_args.my_world_size)
-# ds = ds.select(np.arange(script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share))
-#ds = ds.select(np.arange(0, 100))
-ds = ds.select(np.arange(0, 300))
-#ds = ds.select(np.arange(0, 400))
-#ds = ds.select(np.arange(0, 1000))
+ds = ds.select(np.arange(script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share))
 
 print([script_args.local_index * one_num_share, (script_args.local_index + 1) * one_num_share])
 print(ds, script_args.dataset_name_or_path)
