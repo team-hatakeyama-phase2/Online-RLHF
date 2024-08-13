@@ -5,7 +5,7 @@ from typing import Optional
 import numpy as np
 import torch
 from datasets import Dataset, load_dataset
-from dpo import PreferenceTrainer
+from dpo_precompute import PreferenceTrainer
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -103,8 +103,6 @@ class ScriptArguments:
     eot_token: Optional[str] = field(default="", metadata={"help": "the end of text token"})
     mask_prompt: Optional[bool] = field(default=False, metadata={"help": "mask prompt"})
     len_penalty: Optional[float] = field(default=0, metadata={"help": "the length penalty"})
-    deepspeed: Optional[str] = field(default="", metadata={"help": "deepspeed config path"})
-#    local_rank: Optional[int] = field(default=1, metadata={"help": "deepspeed local rank"})
 
 
 def prepare_data(
@@ -182,9 +180,9 @@ def prepare_data(
     if sanity_check:
         dataset = dataset.select(range(min(len(dataset), 100))) # eval
     else:
-        #dataset = dataset.select(range(100, len(dataset))) # train
+        # dataset = dataset.select(range(100, len(dataset))) # train
         dataset = dataset.select(range(100, 300)) # train 検証用
-    
+
     return dataset
 
 
@@ -211,21 +209,21 @@ if __name__ == "__main__":
             name for name, buffer in model.named_buffers() if buffer.dtype == torch.bool
         ]
 
-    if script_args.ref_model:
-        ref_name = script_args.ref_model
-    else:
-        ref_name = script_args.model_name_or_path
+    # if script_args.ref_model:
+    #     ref_name = script_args.ref_model
+    # else:
+    #     ref_name = script_args.model_name_or_path
 
-    model_ref = AutoModelForCausalLM.from_pretrained(
-        ref_name,
-        torch_dtype=torch.bfloat16,
-        use_flash_attention_2=True,
-        #load_in_4bit=True,
-        trust_remote_code=True,
-        ##device_map='cpu',
-        #device_map=torch.device("cuda:7"),
-        #device_map=torch.device("cuda:2"),
-        )
+    # model_ref = AutoModelForCausalLM.from_pretrained(
+    #     ref_name,
+    #     torch_dtype=torch.bfloat16,
+    #     use_flash_attention_2=True,
+    #     #load_in_4bit=True,
+    #     trust_remote_code=True,
+    #     ##device_map='cpu',
+    #     #device_map=torch.device("cuda:7"),
+    #     #device_map=torch.device("cuda:2"),
+    #     )
 
     tokenizer = AutoTokenizer.from_pretrained(script_args.model_name_or_path)
     if script_args.eos_padding:
@@ -302,9 +300,34 @@ if __name__ == "__main__":
         def on_step_end(self, args, state, control, **kwargs):
             torch.cuda.empty_cache()  # 各ステップ終了時にキャッシュをクリア
 
+    # load precomputed log probs
+    train_reference_chosen_logps = []
+    with open('train_reference_chosen_logps.txt', 'r') as f:
+        for line in f:
+            value = float(line.strip())
+            train_reference_chosen_logps.append(torch.tensor([value]))
+
+    train_reference_rejected_logps = []
+    with open('train_reference_rejected_logps.txt', 'r') as f:
+        for line in f:
+            value = float(line.strip())
+            train_reference_rejected_logps.append(torch.tensor([value]))
+
+    eval_reference_chosen_logps = []
+    with open('eval_reference_chosen_logps.txt', 'r') as f:
+        for line in f:
+            value = float(line.strip())
+            eval_reference_chosen_logps.append(torch.tensor([value]))
+
+    eval_reference_rejected_logps = []
+    with open('eval_reference_rejected_logps.txt', 'r') as f:
+        for line in f:
+            value = float(line.strip())
+            eval_reference_rejected_logps.append(torch.tensor([value]))
+
     dpo_trainer = PreferenceTrainer(
         model,
-        model_ref,
+        model,
         args=training_args,
         beta=script_args.beta,
         train_dataset=train_dataset,
@@ -316,7 +339,20 @@ if __name__ == "__main__":
         mask_prompt=script_args.mask_prompt,
         len_penalty=script_args.len_penalty,
         # callbacks=[ClearCacheCallback()],
+        #train_reference_chosen_logps=torch.tensor(train_reference_chosen_logps, dtype=torch.bfloat16),
+        #train_reference_rejected_logps=torch.tensor(train_reference_rejected_logps, dtype=torch.bfloat16),
+        #eval_reference_chosen_logps=torch.tensor(eval_reference_chosen_logps, dtype=torch.bfloat16),
+        #eval_reference_rejected_logps=torch.tensor(eval_reference_rejected_logps, dtype=torch.bfloat16),
 
+        #train_reference_chosen_logps=torch.tensor(train_reference_chosen_logps),
+        #train_reference_rejected_logps=torch.tensor(train_reference_rejected_logps),
+        #eval_reference_chosen_logps=torch.tensor(eval_reference_chosen_logps),
+        #eval_reference_rejected_logps=torch.tensor(eval_reference_rejected_logps),
+
+        train_reference_chosen_logps=train_reference_chosen_logps,
+        train_reference_rejected_logps=train_reference_rejected_logps,
+        eval_reference_chosen_logps=eval_reference_chosen_logps,
+        eval_reference_rejected_logps=eval_reference_rejected_logps,
     )
     print("begin to train")
 
